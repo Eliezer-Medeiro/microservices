@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # FACOFFEE - Ambiente de Desenvolvimento Local
 
 Este repositório fornece a infraestrutura base para a disciplina de Engenharia de Software, apoiando o desenvolvimento dos serviços propostos para a solução FACOFFEE.
@@ -224,3 +225,6 @@ Além disso, a role `MANAGER` possui permissões de gestão de usuários no real
 - Guia da equipe Finance: [`GUIA_EQUIPE_FINANCE.md`](./GUIA_EQUIPE_FINANCE.md)
 - Compose local: [`docker-compose.yml`](./docker-compose.yml)
 - Realm Keycloak: [`keycloak/realm-facoffee.json`](./keycloak/realm-facoffee.json)
+=======
+# microservices
+>>>>>>> fcab15a2d8b5c88cab05c109cf0cd3a8c135de8a
