@@ -59,5 +59,47 @@ services:
       - "1025:1025"
       - "8025:8025"
 
+  # Gerenciador de coordenação do Kafka
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: facoffee-zookeeper
+    hostname: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  # O container do Apache Kafka para resolver os WARNs de conexão do Spring
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: facoffee-kafka
+    hostname: kafka
+    ports:
+      - "9092:9092"
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      # Configura duas pontes de escuta: uma interna para containers e outra (9092) para sua aplicação local rodando fora do Docker
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: facoffee-postgres
+    hostname: postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: facoffee
+      POSTGRES_PASSWORD: facoffee
+      POSTGRES_DB: financedb
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
 volumes:
   keycloak_data:
+  postgres_data:

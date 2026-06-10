@@ -19,7 +19,7 @@ import ufms.facoffe.finance.domain.enums.PaymentProofStatus;
 public class PaymentProof {
     @Id
     private Long id;
-    private String pendingId;
+    private Long pendingId;
     private String userId;
     private BigDecimal amount;
     private LocalDate paymentDate;

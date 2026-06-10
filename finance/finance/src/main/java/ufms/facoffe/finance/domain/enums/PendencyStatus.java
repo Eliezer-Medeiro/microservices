@@ -1,5 +1,5 @@
 package ufms.facoffe.finance.domain.enums;
 
 public enum PendencyStatus {
-    PENDING, WAITING_PAYMENT, PAID, REJECTED, CANCELED
+    PENDING, WAITING_VALIDATION, PAID, REJECTED, CANCELLED
 }
