@@ -22,7 +22,7 @@ public class Expense {
     
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private String id;
 
     @Enumerated(EnumType.STRING)
     private ExpenseCategory category;

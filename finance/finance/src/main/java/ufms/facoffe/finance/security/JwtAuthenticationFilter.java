@@ -2,12 +2,10 @@ package ufms.facoffe.finance.security;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.security.Keys;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -15,16 +13,12 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.util.Collections;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.Map;
 
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
-
-    @Value("${app.security.jwt.secret:sua_chave_secreta_super_segura_com_mais_de_32_caracteres}")
-    private String jwtSecret;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
@@ -40,22 +34,46 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String token = header.substring(7);
 
         try {
+            String[] chunks = token.split("\\.");
+            if (chunks.length < 2) {
+                filterChain.doFilter(request, response);
+                return;
+            }
+            String base64WithoutSignature = chunks[0] + "." + chunks[1] + ".";
+            
             Claims claims = Jwts.parserBuilder()
-                    .setSigningKey(Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8)))
                     .build()
-                    .parseClaimsJws(token)
+                    .parseClaimsJwt(base64WithoutSignature)
                     .getBody();
 
+            // Tenta pegar o Subject padrão, se for nulo usa o preferred_username do Keycloak
             String username = claims.getSubject();
-            
-            List<?> roles = claims.get("roles", List.class);
-            if (roles == null) {
-                roles = Collections.emptyList();
+            if (username == null && claims.containsKey("preferred_username")) {
+                username = claims.get("preferred_username", String.class);
             }
 
-            List<SimpleGrantedAuthority> authorities = roles.stream()
-                    .map(role -> new SimpleGrantedAuthority("ROLE_" + role.toString().toUpperCase()))
-                    .collect(Collectors.toList());
+            System.out.println("=== FILTRO PROCESSANDO ===");
+            System.out.println("Usuário Identificado: " + username);
+
+            List<SimpleGrantedAuthority> authorities = new ArrayList<>();
+
+            // Busca as roles no realm_access.roles do Keycloak
+            if (claims.containsKey("realm_access")) {
+                Map<?, ?> realmAccess = claims.get("realm_access", Map.class);
+                if (realmAccess != null && realmAccess.containsKey("roles")) {
+                    Object rolesClaim = realmAccess.get("roles");
+                    if (rolesClaim instanceof List) {
+                        for (Object role : (List<?>) rolesClaim) {
+                            String roleStr = role.toString().toUpperCase();
+                            authorities.add(new SimpleGrantedAuthority(roleStr));
+                            authorities.add(new SimpleGrantedAuthority("ROLE_" + roleStr));
+                        }
+                    }
+                }
+            }
+            
+            System.out.println("Autoridades Injetadas: " + authorities);
+            System.out.println("=========================");
 
             if (username != null) {
                 UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(

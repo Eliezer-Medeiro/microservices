@@ -16,7 +16,7 @@ import ufms.facoffe.finance.domain.enums.PendencyStatus;
 @Data
 public class FinancialPending {
     @Id
-    private Long id;
+    private String id;
     private String source;
     private String sourceId;
     private String userId;

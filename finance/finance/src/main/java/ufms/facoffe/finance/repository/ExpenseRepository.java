@@ -5,6 +5,5 @@ import org.springframework.stereotype.Repository;
 import ufms.facoffe.finance.domain.Expense;
 
 @Repository
-public interface ExpenseRepository extends JpaRepository<Expense, Long> {
-    
+public interface ExpenseRepository extends JpaRepository<Expense, String> {
 }

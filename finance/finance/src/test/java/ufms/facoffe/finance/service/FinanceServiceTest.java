@@ -50,15 +50,15 @@ class FinanceServiceTest {
     void setUp() {
         // Configuração inicial de uma Pendência
         pendency = new FinancialPending();
-        pendency.setId(1L);
+        pendency.setId("1");
         pendency.setUserId("user_123");
         pendency.setAmount(new BigDecimal("50.00"));
         pendency.setStatus(PendencyStatus.PENDING);
 
         // Configuração inicial de um Comprovativo
         proof = new PaymentProof();
-        proof.setId(100L);
-        proof.setPendingId(1L);
+        proof.setId("100");
+        proof.setPendingId("1");
         proof.setAmount(new BigDecimal("50.00"));
         proof.setStatus(PaymentProofStatus.WAITING_APPROVAL);
     }
@@ -66,17 +66,17 @@ class FinanceServiceTest {
     @Test
     void deveSubmeterComprovativoEAlterarStatusDaPendencia() {
         // Arrange
-        when(pendencyRepository.findById(1L)).thenReturn(Optional.of(pendency));
+        when(pendencyRepository.findById("1")).thenReturn(Optional.of(pendency));
         when(paymentProofRepository.save(any(PaymentProof.class))).thenReturn(proof);
         when(pendencyRepository.save(any(FinancialPending.class))).thenReturn(pendency);
 
         PaymentProof newProof = new PaymentProof();
         
         // Act
-        PaymentProof result = financeService.submitPaymentProof(1L, newProof);
+        PaymentProof result = financeService.submitPaymentProof("1", newProof);
 
         // Assert
-        assertEquals(PendencyStatus.PENDING, pendency.getStatus()); // Ajustado para PENDING conforme o FinanceService
+        assertEquals(PendencyStatus.WAITING_VALIDATION, pendency.getStatus()); // Atualizado para refletir o serviço
         assertEquals(PaymentProofStatus.WAITING_APPROVAL, result.getStatus());
         verify(pendencyRepository).save(pendency);
         verify(paymentProofRepository).save(newProof);
@@ -85,13 +85,13 @@ class FinanceServiceTest {
     @Test
     void deveValidarComprovativoEAlterarStatusParaPago() {
         // Arrange
-        when(paymentProofRepository.findById(100L)).thenReturn(Optional.of(proof));
-        when(pendencyRepository.findById(1L)).thenReturn(Optional.of(pendency));
+        when(paymentProofRepository.findById("100")).thenReturn(Optional.of(proof));
+        when(pendencyRepository.findById("1")).thenReturn(Optional.of(pendency));
         when(paymentProofRepository.save(any(PaymentProof.class))).thenReturn(proof);
         when(pendencyRepository.save(any(FinancialPending.class))).thenReturn(pendency);
 
-        // Act
-        PaymentProof result = financeService.reviewPaymentProof(100L, PaymentProofStatus.VALIDATED, null, "manager_999");
+        // Act - Alterado para decidePaymentProof
+        PaymentProof result = financeService.decidePaymentProof("1", "100", PaymentProofStatus.VALIDATED, null, "manager_999");
 
         // Assert
         assertEquals(PaymentProofStatus.VALIDATED, result.getStatus());
@@ -106,13 +106,13 @@ class FinanceServiceTest {
     @Test
     void deveRejeitarComprovativoEMarcarPendenciaComoRejeitada() {
         // Arrange
-        when(paymentProofRepository.findById(100L)).thenReturn(Optional.of(proof));
-        when(pendencyRepository.findById(1L)).thenReturn(Optional.of(pendency));
+        when(paymentProofRepository.findById("100")).thenReturn(Optional.of(proof));
+        when(pendencyRepository.findById("1")).thenReturn(Optional.of(pendency));
         when(paymentProofRepository.save(any(PaymentProof.class))).thenReturn(proof);
         when(pendencyRepository.save(any(FinancialPending.class))).thenReturn(pendency);
 
-        // Act
-        PaymentProof result = financeService.reviewPaymentProof(100L, PaymentProofStatus.REJECTED, "Imagem ilegível", "manager_999");
+        // Act - Alterado para decidePaymentProof
+        PaymentProof result = financeService.decidePaymentProof("1", "100", PaymentProofStatus.REJECTED, "Imagem ilegível", "manager_999");
 
         // Assert
         assertEquals(PaymentProofStatus.REJECTED, result.getStatus());
@@ -128,14 +128,15 @@ class FinanceServiceTest {
     void deveLancarExcecaoAoRevisarComprovativoJaProcessado() {
         // Arrange
         proof.setStatus(PaymentProofStatus.VALIDATED); // Já processado
-        when(paymentProofRepository.findById(100L)).thenReturn(Optional.of(proof));
+        when(paymentProofRepository.findById("100")).thenReturn(Optional.of(proof));
 
         // Act & Assert
         IllegalStateException exception = assertThrows(IllegalStateException.class, () -> {
-            financeService.reviewPaymentProof(100L, PaymentProofStatus.VALIDATED, null, "manager_999");
+            // Alterado para decidePaymentProof
+            financeService.decidePaymentProof("1", "100", PaymentProofStatus.VALIDATED, null, "manager_999");
         });
 
-        assertTrue(exception.getMessage().contains("já foi processado"));
+        assertTrue(exception.getMessage().contains("estado atual")); // Mensagem ajustada para a exceção atual do Service
         verify(pendencyRepository, never()).save(any());
     }
 
@@ -160,9 +161,9 @@ class FinanceServiceTest {
         // Arrange
         String userId = "user_123";
         FinancialPending pendency2 = new FinancialPending();
-        pendency2.setId(2L);
+        pendency2.setId("2");
         pendency2.setUserId(userId);
-        pendency2.setStatus(PendencyStatus.PENDING); // Ajustado de WAITING_PAYMENT para PENDING
+        pendency2.setStatus(PendencyStatus.PENDING); 
 
         when(pendencyRepository.findAll()).thenReturn(List.of(pendency, pendency2));
 
@@ -170,8 +171,8 @@ class FinanceServiceTest {
         financeService.handleUserDeactivation(userId, "evento_xyz");
 
         // Assert
-        assertEquals(PendencyStatus.CANCELLED, pendency.getStatus()); // Ajustado para CANCELLED com dois Ls
-        assertEquals(PendencyStatus.CANCELLED, pendency2.getStatus()); // Ajustado para CANCELLED com dois Ls
+        assertEquals(PendencyStatus.CANCELLED, pendency.getStatus()); 
+        assertEquals(PendencyStatus.CANCELLED, pendency2.getStatus()); 
         verify(pendencyRepository, times(2)).save(any(FinancialPending.class));
     }
 

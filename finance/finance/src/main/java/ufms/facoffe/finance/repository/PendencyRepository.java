@@ -10,7 +10,7 @@ import ufms.facoffe.finance.domain.FinancialPending;
 import ufms.facoffe.finance.domain.enums.PendencyStatus;
 
 @Repository
-public interface PendencyRepository extends JpaRepository<FinancialPending, Long> {
+public interface PendencyRepository extends JpaRepository<FinancialPending, String> {
     
     @Query("SELECT f FROM FinancialPending f WHERE " +
            "(:userId IS NULL OR f.userId = :userId) AND " +

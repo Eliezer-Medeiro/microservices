@@ -26,8 +26,8 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                // Permite que qualquer um tente acessar, as restrições pontuais ficam nos Controllers
-                .anyRequest().authenticated() 
+                
+                .anyRequest().authenticated()
             )
             // Adiciona o nosso filtro de validação JWT antes do filtro padrão de autenticação do Spring
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
