@@ -1,182 +1,186 @@
-<<<<<<< HEAD
-# FACOFFEE - Ambiente de Desenvolvimento Local
+# ☕ Facoffee - Serviço de Finance
 
-Este repositório fornece a infraestrutura base para a disciplina de Engenharia de Software, apoiando o desenvolvimento dos serviços propostos para a solução FACOFFEE.
+Este repositório contém o código-fonte, suíte de testes e documentação do **Serviço de Finance, componente integrante do ecossistema de microsserviços **Facoffee**.
 
-![Arquitetura FACOFFEE](./arquitetura-facoffee.svg)
+O ecossistema é projetado sob os pilares de:
 
-## 1) Objetivo para estudantes
+- Arquitetura Orientada a Eventos (EDA)
+- Descentralização de Dados
+- Segurança Centralizada via API Gateway
+- Controle de Identidade Federado utilizando Keycloak (OAuth2/OIDC)
 
-Neste projeto, vocês irão implementar serviços da solução FACOFFEE seguindo:
+---
 
-- os limites e as responsabilidades definidos na arquitetura;
-- os endpoints, contratos e regras de negócio descritos no OpenAPI;
-- a comunicação assíncrona orientada a eventos, quando aplicável.
+# 🏛️ Visão Geral da Arquitetura
 
-O arquivo [`docker-compose.yml`](./docker-compose.yml) não sobe os serviços de domínio (Users, Participation, Finance etc.).
-Ele sobe apenas as dependências de plataforma para apoiar o desenvolvimento local:
+O ecossistema Facoffee opera através de um fluxo distribuído e blindado por segurança em camadas:
 
-- API Gateway (Nginx)
-- RabbitMQ (mensageria)
-- Keycloak (autenticação e autorização)
-- Mailpit (captura de e-mails em ambiente de desenvolvimento)
+## 1. API Gateway (Nginx)
 
-## 2) Pré-requisitos
+Funciona como ponto único de entrada (**porta 8000**), gerenciando:
 
-- Docker 24+ e Docker Compose v2+
+- Regras de CORS
+- Roteamento inteligente de tráfego
+- Validação de sessão utilizando a diretiva `auth_request`
+- Integração com o endpoint `/userinfo` do Keycloak
+
+## 2. Provedor de Identidade (Keycloak)
+
+Responsável por:
+
+- Gerenciamento de usuários
+- Políticas de acesso
+- Emissão de JWTs assinados com RS256
+
+## 3. Mensageria (Apache Kafka)
+
+Responsável pela comunicação assíncrona entre os microsserviços, propagando eventos de domínio sempre que ocorrem alterações relevantes de estado.
+
+## 4. Microsserviços (Spring Boot)
+
+### Finance Service
+- Porta: `3003`
+
+Cada serviço:
+
+- Possui banco de dados isolado
+- Implementa filtros locais de segurança (`JwtAuthenticationFilter`)
+- Realiza autorizações granulares com `@PreAuthorize`
+
+---
+
+# 🛠️ Tecnologias Utilizadas
+
+## Linguagem
+
+- Java 21
+
+## Framework
+
+- Spring Boot 3.x
+
+### Dependências Spring
+
+- Spring Security (OAuth2 Resource Server)
+- Spring Data JPA
+- Spring for Apache Kafka
+
+## Banco de Dados
+
+- PostgreSQL
+
+## Mensageria
+
+- Apache Kafka
+
+## Infraestrutura
+
+- Docker
+- Docker Compose
+
+## Segurança
+
+- JJWT (Java JWT)
+
+---
+
+# 🚀 Como Executar o Ecossistema
+
+## 1. Pré-requisitos
+
+Certifique-se de possuir:
+
 - Git
-- Navegador web
-- (Opcional) `curl` para testes de API
+- JDK instalado e configurado
+- Docker
+- Docker Compose
 
-Verifique:
+---
 
-```bash
-docker --version
-docker compose version
-```
+## 2. Subir a Infraestrutura
 
-## 3) Preparação inicial
-
-No Linux/macOS, clone e entre no projeto:
-
-```bash
-git clone <url-do-repositorio>
-cd facoffee
-```
-
-## 4) Subindo o ambiente
-
-Inicie os serviços:
+Na raiz do projeto principal:
 
 ```bash
 docker compose up -d
 ```
 
-Confira o status:
+Esse comando iniciará:
+
+- Keycloak
+- Kafka
+- Nginx
+- Bancos de Dados
+- Demais serviços auxiliares
+
+---
+
+## 3. Executar o Serviço Participation
+
+### Maven
 
 ```bash
-docker compose ps
+./mvnw spring-boot:run
 ```
 
-Para parar:
+### Gradle
 
 ```bash
-docker compose down
+./gradlew bootRun
 ```
 
-Para parar removendo volumes (reinício limpo, incluindo Keycloak):
+Após a inicialização, o serviço estará integrado ao ecossistema.
+
+---
+
+# 🔐 Guia de Autenticação e Autorização
+
+O API Gateway utiliza validação baseada em OpenID Connect.
+
+Para acessar qualquer endpoint protegido através da porta pública `8000`, é necessário gerar um token válido.
+
+---
+
+## Geração do Token de Usuário (Client Público)
+
+Fluxo utilizado para simular um usuário autenticado.
 
 ```bash
-docker compose down -v
+curl -X POST "http://localhost:8080/realms/facoffee/protocol/openid-connect/token" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=password" \
+  -d "client_id=facoffee-public" \
+  -d "username=facoffee@facom.ufms.br" \
+  -d "password=facoffee" \
+  -d "scope=openid roles"
 ```
 
-## 5) Interfaces disponíveis
+### Observação
 
-### API Gateway (Nginx)
+A inclusão explícita dos escopos:
 
-- URL base: <a href="http://localhost:8000" target="_blank" rel="noopener noreferrer">http://localhost:8000</a>
-- Healthcheck: <a href="http://localhost:8000/health" target="_blank" rel="noopener noreferrer">http://localhost:8000/health</a>
-- Uso principal: entrada única HTTP para os serviços de domínio
+```text
+openid roles
+```
 
-Rotas de proxy por domínio:
+é obrigatória.
 
-- `/api/users/*` -> `host.docker.internal:3001`
-- `/api/participation/*` -> `host.docker.internal:3002`
-- `/api/finance/*` -> `host.docker.internal:3003`
+Motivos:
 
-Regras de autenticação no gateway:
+- `openid` permite a validação no endpoint `/userinfo`
+- `roles` força a inclusão da claim:
 
-- `POST /api/users` é público (sem token), conforme contrato.
-- Demais rotas `/api/*` exigem `Authorization: Bearer <token>` válido.
-- Validação do token é feita no Keycloak (`/userinfo`) pelo gateway.
+```json
+realm_access.roles
+```
 
-### RabbitMQ
+possibilitando a autorização correta dentro da aplicação Spring Boot.
 
-- URL do painel: <a href="http://localhost:15672" target="_blank" rel="noopener noreferrer">http://localhost:15672</a>
-- Porta AMQP: `localhost:5672`
-- Uso principal: publicar e consumir eventos entre serviços
+---
 
-Observação: as configurações iniciais são carregadas por:
+## Geração de Token de Serviço (Client Privado)
 
-- [`rabbitmq/rabbitmq.conf`](./rabbitmq/rabbitmq.conf)
-- [`rabbitmq/definitions.json`](./rabbitmq/definitions.json)
-
-### Keycloak
-
-- Admin Console: <a href="http://localhost:8080" target="_blank" rel="noopener noreferrer">http://localhost:8080</a>
-- Usuário admin: `facoffee`
-- Senha admin: `facoffee`
-- Realm pré-configurado: `facoffee`
-- Usuário inicial do realm: `facoffee@facom.ufms.br` (role `MANAGER`)
-
-Separação importante de realms (para evitar confusão):
-
-- Realm `master`: realm interno e obrigatório do Keycloak, usado para administração da plataforma.
-- Realm `facoffee`: realm da aplicação, que deve ser usado pelos serviços e estudantes para testes de autenticação/autorização.
-- O realm `master` não pode ser removido, e `facoffee` não pode substituí-lo como realm de sistema.
-
-Clients criados automaticamente no realm `facoffee`:
-
-- `facoffee-public` (cliente público)
-- `facoffee-private` (cliente confidencial)
-  - Secret fixo: `facoffee-private-secret`
-- `domain-roles` (client scope para expor roles de domínio na claim `roles`)
-
-Arquivo de import do realm:
-
-- [`keycloak/realm-facoffee.json`](./keycloak/realm-facoffee.json)
-
-### Mailpit
-
-- UI web (caixa de entrada dev): <a href="http://localhost:8025" target="_blank" rel="noopener noreferrer">http://localhost:8025</a>
-- SMTP local: `localhost:1025`
-
-No ambiente atual, o Keycloak usa o Mailpit por padrão para envio de e-mails no realm `facoffee`.
-Isso significa que as mensagens ficam visíveis na UI do Mailpit e não são entregues para Gmail ou outros provedores externos.
-
-## 6) Fluxo recomendado de uso em aula/projeto
-
-1. Suba a infraestrutura com `docker compose up -d`.
-2. Suba os serviços de domínio nas portas `3001..x` (ex.: Users `3001`, Participation `3002`, Finance `3003`).
-3. Acesse o Keycloak e confira o realm e os clients.
-   - Para o projeto, sempre trabalhe no realm `facoffee`.
-4. Acesse o RabbitMQ e valide exchanges/filas conforme o desenho arquitetural.
-5. Implemente seu serviço de domínio (Users/Participation/Finance etc.).
-6. Aponte seu serviço para:
-    - Keycloak (JWT/OIDC)
-    - RabbitMQ (eventos)
-    - API definida em [`api-docs.yaml`](./api-docs.yaml)
-7. Chame a API sempre por `http://localhost:8000/api`.
-8. Use o Mailpit para inspecionar e-mails gerados em cenários de notificação/autenticação.
-
-## 7) Como usar o contrato da API (`api-docs.yaml`)
-
-O arquivo [`api-docs.yaml`](./api-docs.yaml) define:
-
-- endpoints HTTP dos domínios;
-- regras de segurança por operação (`bearerAuth`, roles e regras de acesso);
-- formatos de request/response;
-
-Para visualizar e explorar os endpoints de forma interativa, recomenda-se usar o Swagger:
-
-- Swagger Editor: <a href="https://editor.swagger.io/" target="_blank" rel="noopener noreferrer">https://editor.swagger.io/</a>
-
-Passo rápido:
-
-1. Abra o Swagger Editor.
-2. Cole o conteúdo de [`api-docs.yaml`](./api-docs.yaml).
-3. Navegue pelos endpoints, schemas e exemplos.
-
-Sugestão de trabalho:
-
-- Escolha um bounded context (ex.: Users).
-- Implemente os endpoints obrigatórios no seu serviço.
-- Garanta conformidade de payloads e códigos HTTP com o OpenAPI.
-- Integre a autorização com tokens emitidos pelo Keycloak.
-
-## 8) Teste rápido de autenticação
-
-Exemplo para obter token do client privado (usado pelo serviço de usuários):
+Fluxo destinado à comunicação máquina-para-máquina (M2M).
 
 ```bash
 curl -X POST "http://localhost:8080/realms/facoffee/protocol/openid-connect/token" \
@@ -186,45 +190,149 @@ curl -X POST "http://localhost:8080/realms/facoffee/protocol/openid-connect/toke
   -d "client_secret=facoffee-private-secret"
 ```
 
-Exemplo para obter token com o client público (usuário do realm):
+---
 
-```bash
-curl -X POST "http://localhost:8080/realms/facoffee/protocol/openid-connect/token" \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "grant_type=password" \
-  -d "client_id=facoffee-public" \
-  -d "username=facoffee@facom.ufms.br" \
-  -d "password=facoffee"
-```
+# 📡 Exemplos de Uso da API
 
-Com o token em mãos, use no cabeçalho:
+Todas as chamadas devem ser realizadas através do Gateway:
 
 ```text
-Authorization: Bearer <access_token>
+http://localhost:8000
 ```
 
-As roles de domínio são emitidas diretamente na claim `roles` do token (ex.: `MANAGER`, `PARTICIPANT`).
-Além disso, a role `MANAGER` possui permissões de gestão de usuários no realm (`realm-management`: `query-users`, `view-users`, `manage-users`).
+e devem incluir:
 
-## 9) Solução de problemas comuns
+```http
+Authorization: Bearer <ACCESS_TOKEN>
+```
 
-- Porta em uso:
-  - Verifique se `8000`, `5672`, `15672`, `8080`, `1025` ou `8025` já estão ocupadas.
-- Realm não apareceu no Keycloak:
-  - Rode `docker compose down -v` e suba novamente.
-- E-mail não chega em caixa externa:
-  - Comportamento esperado no dev; verifique no Mailpit.
+---
 
-## 10) Referências importantes
+## Criar Participação
 
-- Arquitetura: [`arquitetura-facoffee.svg`](./arquitetura-facoffee.svg)
-- Contrato API: [`api-docs.yaml`](./api-docs.yaml)
-- Contrato assíncrono: [`async-docs.yaml`](./async-docs.yaml)
-- Guia da equipe Users: [`GUIA_EQUIPE_USERS.md`](./GUIA_EQUIPE_USERS.md)
-- Guia da equipe Participation: [`GUIA_EQUIPE_PARTICIPATION.md`](./GUIA_EQUIPE_PARTICIPATION.md)
-- Guia da equipe Finance: [`GUIA_EQUIPE_FINANCE.md`](./GUIA_EQUIPE_FINANCE.md)
-- Compose local: [`docker-compose.yml`](./docker-compose.yml)
-- Realm Keycloak: [`keycloak/realm-facoffee.json`](./keycloak/realm-facoffee.json)
-=======
-# microservices
->>>>>>> fcab15a2d8b5c88cab05c109cf0cd3a8c135de8a
+### Endpoint
+
+```http
+POST /api/participation
+```
+
+### URL
+
+```text
+http://localhost:8000/api/participation
+```
+
+### Headers
+
+```http
+Authorization: Bearer <ACCESS_TOKEN>
+Content-Type: application/json
+```
+
+### Body
+
+```json
+{
+  "userId": "3d50189c-9b67-41d4-af36-7da5226a1bf5",
+  "eventId": 101,
+  "status": "CONFIRMED"
+}
+```
+
+---
+
+## Listar Participações
+
+### Endpoint
+
+```http
+GET /api/participation
+```
+
+### URL
+
+```text
+http://localhost:8000/api/participation
+```
+
+### Headers
+
+```http
+Authorization: Bearer <ACCESS_TOKEN>
+```
+
+---
+
+# 🧪 Testes Automatizados
+
+O microsserviço possui cobertura completa de testes para validar:
+
+- Regras de negócio
+- Persistência de dados
+- Segurança das rotas
+- Controle de acesso baseado em roles
+
+Como as chaves RSA utilizadas pelo Keycloak mudam dinamicamente em tempo de execução, os testes utilizam **JWT Mocking**, eliminando a necessidade de executar o Keycloak durante os testes.
+
+---
+
+## Executar Testes
+
+### Maven
+
+```bash
+./mvnw test
+```
+
+### Gradle
+
+```bash
+./gradlew test
+```
+
+---
+
+# 🔒 Exemplo de Teste de Segurança
+
+Utilizando MockMvc com JWT Mock:
+
+```java
+@Test
+@DisplayName("Deve permitir acesso à rota de criação quando o usuário for MANAGER")
+void deveCriarParticipacaoComSucesso() throws Exception {
+
+    mockMvc.perform(post("/api/participation")
+            .with(SecurityMockMvcConfigurers.mockJwt()
+                    .jwt(jwt -> jwt.claim(
+                        "preferred_username",
+                        "facoffee@facom.ufms.br"
+                    ))
+                    .authorities(
+                        new SimpleGrantedAuthority("ROLE_MANAGER")
+                    ))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {
+                    "userId":"123",
+                    "eventId":1,
+                    "status":"CONFIRMED"
+                }
+            """))
+            .andExpect(status().isCreated());
+}
+```
+
+---
+
+# 📌 Características do Serviço
+
+- Arquitetura baseada em eventos (EDA)
+- Segurança centralizada via API Gateway
+- Autenticação federada com Keycloak
+- Comunicação assíncrona via Kafka
+- Banco de dados isolado por serviço
+- Controle granular de permissões com Spring Security
+- Testes automatizados independentes do Keycloak
+- Integração completa com Docker Compose
+
+---
